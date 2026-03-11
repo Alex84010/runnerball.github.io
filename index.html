@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Background Image</title>
+<title>Jeu</title>
 
 <style>
 html, body {
@@ -13,16 +13,37 @@ html, body {
 
 body {
   background-image: url("bg.png");
-  background-size: cover;       /* l'image remplit l'écran */
-  background-position: center;  /* centrée */
-  background-repeat: no-repeat; /* pas de répétition */
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   height: 100vh;
+  position: relative;
+}
+
+/* bouton play en haut */
+#play {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+/* balle au centre */
+#balle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 </style>
 
 </head>
 
 <body>
+
+<img id="play" src="play.png" alt="Play">
+<img id="balle" src="balle.png" alt="Balle">
 
 </body>
 </html>
