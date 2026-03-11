@@ -2,157 +2,332 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Jeu balle</title>
-
+<title>Jeu</title>
 <style>
-
-html,body{
-margin:0;
-padding:0;
-height:100%;
-overflow:hidden;
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  user-select: none;
 }
 
-body{
-background:url("bg.png") center/cover no-repeat;
+body {
+  background-image: url("bg.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  height: 100vh;
+  position: relative;
 }
 
-#play{
-position:absolute;
-top:30px;
-left:50%;
-transform:translateX(-50%);
-width:150px;
-cursor:pointer;
+/* ── MENU ── */
+#menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  z-index: 10;
 }
 
-#balle{
-position:absolute;
-width:80px;
-left:50%;
-top:40%;
-transform:translate(-50%,-50%);
+#play {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 150px;
+  height: auto;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+#play:active { transform: translateX(-50%) scale(0.93); }
+
+/* balle menu (centrée) */
+#balle-menu {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+  height: auto;
+  pointer-events: none;
 }
 
-.platform{
-position:absolute;
-width:140px;
+/* ── GAME ── */
+#game {
+  position: absolute;
+  inset: 0;
+  display: none;
+  overflow: hidden;
 }
 
+/* La balle de jeu */
+#balle-game {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+  /* On utilise object-fit pour que l'image 2048×2048 rentre bien */
+}
+#balle-game img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Plateformes */
+.platform {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  pointer-events: none;
+}
+.platform img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 </style>
 </head>
-
 <body>
 
-<img id="play" src="play.png">
-<img id="balle" src="balle.png">
+<!-- ══ MENU ══ -->
+<div id="menu">
+  <img id="play" src="play.png" alt="Play" onclick="startGame()">
+  <img id="balle-menu" src="balle.png" alt="Balle">
+</div>
+
+<!-- ══ GAME ══ -->
+<div id="game"></div>
 
 <script>
+/* ═══════════════════════════════════════════════════
+   CONFIG
+═══════════════════════════════════════════════════ */
+const BALL_SIZE       = 120;   // px (affiché)
+const PLAT_SIZE       = 120;   // px (affiché)
+const GRAVITY         = 0.55;  // px/frame²
+const JUMP_FORCE      = -14;   // px/frame  (négatif = vers le haut)
+const SCROLL_SPEED    = 3;     // px/frame  les plateformes avancent vers la gauche
+const PLAT_GAP_MIN    = 220;   // espace horizontal min entre plateformes
+const PLAT_GAP_MAX    = 340;   // espace horizontal max
+const PLAT_Y_RANGE    = 120;   // variation verticale max par rapport à la précédente
 
-const balle = document.getElementById("balle")
-const play = document.getElementById("play")
+/* ═══════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════ */
+let vy = 0;           // vitesse verticale de la balle
+let ballY = 0;        // position top de la balle (px)
+const BALL_X = 200;   // position horizontale fixe de la balle
+let platforms = [];   // [{el, x, y}]
+let rafId = null;
+let gameRunning = false;
+let screenH, screenW;
 
-let gameRunning=false
-
-let x=window.innerWidth/2
-let y=window.innerHeight*0.4
-
-let vx=3
-let vy=0
-let gravity=0.6
-let jump=-12
-
-let platforms=[]
-
-play.onclick=()=>{
-play.style.display="none"
-startGame()
+/* ═══════════════════════════════════════════════════
+   HELPERS
+═══════════════════════════════════════════════════ */
+function randBetween(a, b) {
+  return a + Math.random() * (b - a);
 }
 
-function startGame(){
-
-gameRunning=true
-
-createPlatforms()
-
-gameLoop()
-
+function createPlatformEl() {
+  const wrap = document.createElement('div');
+  wrap.className = 'platform';
+  const img = document.createElement('img');
+  img.src = 'pose1.png';
+  img.alt = 'plateforme';
+  wrap.appendChild(img);
+  return wrap;
 }
 
-function createPlatforms(){
-
-for(let i=0;i<12;i++){
-
-let p=document.createElement("img")
-p.src="pose1.png"
-p.className="platform"
-
-let px=i*350+200
-let py=Math.random()*window.innerHeight*0.6+200
-
-p.style.left=px+"px"
-p.style.top=py+"px"
-
-document.body.appendChild(p)
-
-platforms.push({
-el:p,
-x:px,
-y:py,
-w:140,
-h:30
-})
-
+function spawnPlatform(x, y) {
+  const el = createPlatformEl();
+  document.getElementById('game').appendChild(el);
+  const p = { el, x, y };
+  movePlatform(p);
+  platforms.push(p);
+  return p;
 }
 
+function movePlatform(p) {
+  p.el.style.left = p.x + 'px';
+  p.el.style.top  = p.y + 'px';
 }
 
-function gameLoop(){
-
-if(!gameRunning)return
-
-vy+=gravity
-x+=vx
-y+=vy
-
-platforms.forEach(p=>{
-
-if(
-x+40>p.x &&
-x-40<p.x+p.w &&
-y+40>p.y &&
-y+40<p.y+20 &&
-vy>0
-){
-vy=0
-y=p.y-40
+function removePlatform(p) {
+  p.el.remove();
 }
 
-})
+/* ═══════════════════════════════════════════════════
+   INIT GAME
+═══════════════════════════════════════════════════ */
+function startGame() {
+  // Cache le menu
+  document.getElementById('menu').style.display = 'none';
 
-if(y>window.innerHeight){
-location.reload()
+  const gameEl = document.getElementById('game');
+  gameEl.style.display = 'block';
+  gameEl.innerHTML = '';   // nettoyage au cas où
+
+  screenW = window.innerWidth;
+  screenH = window.innerHeight;
+
+  // Crée la balle de jeu
+  const ballEl = document.createElement('div');
+  ballEl.id = 'balle-game';
+  const ballImg = document.createElement('img');
+  ballImg.src = 'balle.png';
+  ballImg.alt = 'Balle';
+  ballEl.appendChild(ballImg);
+  gameEl.appendChild(ballEl);
+
+  platforms = [];
+
+  // Première plateforme : juste sous la balle (centre écran)
+  const firstPlatY = screenH / 2 + BALL_SIZE * 0.55; // 5 % sous la balle = un peu plus que la moitié de la balle
+  // On positionne la balle exactement sur cette première plateforme
+  ballY = firstPlatY - BALL_SIZE;
+  vy = 0;
+
+  const firstPlat = spawnPlatform(BALL_X - PLAT_SIZE / 2, firstPlatY);
+
+  // Génère les plateformes suivantes vers la droite
+  let lastX = firstPlat.x;
+  let lastY = firstPlatY;
+  for (let i = 0; i < 12; i++) {
+    lastX += randBetween(PLAT_GAP_MIN, PLAT_GAP_MAX);
+    lastY += randBetween(-PLAT_Y_RANGE, PLAT_Y_RANGE);
+    // Garde dans les limites de l'écran
+    lastY = Math.min(screenH - PLAT_SIZE - 10, Math.max(screenH * 0.25, lastY));
+    spawnPlatform(lastX, lastY);
+  }
+
+  gameRunning = true;
+
+  // Tap / clic → saut
+  gameEl.addEventListener('pointerdown', onTap);
+
+  rafId = requestAnimationFrame(loop);
 }
 
-balle.style.left=x+"px"
-balle.style.top=y+"px"
-
-requestAnimationFrame(gameLoop)
-
+/* ═══════════════════════════════════════════════════
+   SAUT
+═══════════════════════════════════════════════════ */
+function onTap(e) {
+  e.preventDefault();
+  if (!gameRunning) return;
+  vy = JUMP_FORCE;
 }
 
-function jumpBall(){
+/* ═══════════════════════════════════════════════════
+   BOUCLE DE JEU
+═══════════════════════════════════════════════════ */
+function loop() {
+  if (!gameRunning) return;
 
-if(!gameRunning)return
+  // Physique verticale
+  vy += GRAVITY;
+  ballY += vy;
 
-vy=jump
+  // Scroll horizontal : déplace toutes les plateformes vers la gauche
+  let lastPlatX = -Infinity;
+  for (const p of platforms) {
+    p.x -= SCROLL_SPEED;
+    movePlatform(p);
+    if (p.x > lastPlatX) lastPlatX = p.x;
+  }
 
+  // Supprime les plateformes sorties à gauche
+  platforms = platforms.filter(p => {
+    if (p.x + PLAT_SIZE < -50) {
+      removePlatform(p);
+      return false;
+    }
+    return true;
+  });
+
+  // Génère de nouvelles plateformes à droite
+  if (lastPlatX < screenW + 200) {
+    const prev = platforms[platforms.length - 1];
+    let newX = (prev ? prev.x : screenW) + randBetween(PLAT_GAP_MIN, PLAT_GAP_MAX);
+    let newY = (prev ? prev.y : screenH / 2) + randBetween(-PLAT_Y_RANGE, PLAT_Y_RANGE);
+    newY = Math.min(screenH - PLAT_SIZE - 10, Math.max(screenH * 0.2, newY));
+    spawnPlatform(newX, newY);
+  }
+
+  // Collision balle ↔ plateformes (atterrissage par le dessus)
+  const ballLeft  = BALL_X;
+  const ballRight = BALL_X + BALL_SIZE;
+  const ballBottom = ballY + BALL_SIZE;
+
+  for (const p of platforms) {
+    const platLeft  = p.x;
+    const platRight = p.x + PLAT_SIZE;
+    const platTop   = p.y;
+
+    // La balle est au-dessus de la plateforme et tombe dessus
+    const overlapX = ballRight > platLeft + 10 && ballLeft < platRight - 10;
+    const landingY = ballBottom >= platTop && ballBottom <= platTop + vy + GRAVITY + 12;
+
+    if (overlapX && landingY && vy >= 0) {
+      ballY = platTop - BALL_SIZE;
+      vy = 0;
+      break;
+    }
+  }
+
+  // Sol → retour au menu
+  if (ballY + BALL_SIZE > screenH + 20) {
+    endGame();
+    return;
+  }
+
+  // Plafond
+  if (ballY < -BALL_SIZE * 2) {
+    ballY = -BALL_SIZE * 2;
+    if (vy < 0) vy = 0;
+  }
+
+  // Mise à jour DOM de la balle
+  const ballEl = document.getElementById('balle-game');
+  if (ballEl) {
+    ballEl.style.left = BALL_X + 'px';
+    ballEl.style.top  = ballY + 'px';
+  }
+
+  rafId = requestAnimationFrame(loop);
 }
 
-window.addEventListener("click",jumpBall)
-window.addEventListener("touchstart",jumpBall)
+/* ═══════════════════════════════════════════════════
+   FIN → RETOUR MENU
+═══════════════════════════════════════════════════ */
+function endGame() {
+  gameRunning = false;
+  cancelAnimationFrame(rafId);
 
+  const gameEl = document.getElementById('game');
+  gameEl.removeEventListener('pointerdown', onTap);
+
+  // Petit délai pour que le joueur voit la chute
+  setTimeout(() => {
+    gameEl.style.display = 'none';
+    gameEl.innerHTML = '';
+    platforms = [];
+
+    // Réaffiche le menu
+    document.getElementById('menu').style.display = 'flex';
+  }, 300);
+}
+
+/* ═══════════════════════════════════════════════════
+   RESIZE
+═══════════════════════════════════════════════════ */
+window.addEventListener('resize', () => {
+  screenW = window.innerWidth;
+  screenH = window.innerHeight;
+});
 </script>
-
 </body>
 </html>
