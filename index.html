@@ -2,52 +2,157 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<title>Jeu</title>
+<title>Jeu balle</title>
 
 <style>
-html, body {
-  margin: 0;
-  padding: 0;
-  height: 100%;
+
+html,body{
+margin:0;
+padding:0;
+height:100%;
+overflow:hidden;
 }
 
-body {
-  background-image: url("bg.png");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  height: 100vh;
-  position: relative;
+body{
+background:url("bg.png") center/cover no-repeat;
 }
 
-/* bouton play en haut */
-#play {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 150px;
-  height: auto;
-  cursor: pointer;
+#play{
+position:absolute;
+top:30px;
+left:50%;
+transform:translateX(-50%);
+width:150px;
+cursor:pointer;
 }
 
-/* balle au centre */
-#balle {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 120px;
-  height: auto;
+#balle{
+position:absolute;
+width:80px;
+left:50%;
+top:40%;
+transform:translate(-50%,-50%);
 }
+
+.platform{
+position:absolute;
+width:140px;
+}
+
 </style>
-
 </head>
 
 <body>
 
-<img id="play" src="play.png" alt="Play">
-<img id="balle" src="balle.png" alt="Balle">
+<img id="play" src="play.png">
+<img id="balle" src="balle.png">
+
+<script>
+
+const balle = document.getElementById("balle")
+const play = document.getElementById("play")
+
+let gameRunning=false
+
+let x=window.innerWidth/2
+let y=window.innerHeight*0.4
+
+let vx=3
+let vy=0
+let gravity=0.6
+let jump=-12
+
+let platforms=[]
+
+play.onclick=()=>{
+play.style.display="none"
+startGame()
+}
+
+function startGame(){
+
+gameRunning=true
+
+createPlatforms()
+
+gameLoop()
+
+}
+
+function createPlatforms(){
+
+for(let i=0;i<12;i++){
+
+let p=document.createElement("img")
+p.src="pose1.png"
+p.className="platform"
+
+let px=i*350+200
+let py=Math.random()*window.innerHeight*0.6+200
+
+p.style.left=px+"px"
+p.style.top=py+"px"
+
+document.body.appendChild(p)
+
+platforms.push({
+el:p,
+x:px,
+y:py,
+w:140,
+h:30
+})
+
+}
+
+}
+
+function gameLoop(){
+
+if(!gameRunning)return
+
+vy+=gravity
+x+=vx
+y+=vy
+
+platforms.forEach(p=>{
+
+if(
+x+40>p.x &&
+x-40<p.x+p.w &&
+y+40>p.y &&
+y+40<p.y+20 &&
+vy>0
+){
+vy=0
+y=p.y-40
+}
+
+})
+
+if(y>window.innerHeight){
+location.reload()
+}
+
+balle.style.left=x+"px"
+balle.style.top=y+"px"
+
+requestAnimationFrame(gameLoop)
+
+}
+
+function jumpBall(){
+
+if(!gameRunning)return
+
+vy=jump
+
+}
+
+window.addEventListener("click",jumpBall)
+window.addEventListener("touchstart",jumpBall)
+
+</script>
 
 </body>
 </html>
