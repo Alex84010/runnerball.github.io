@@ -49,7 +49,7 @@ body {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 120px;
+  width: 180px;
   height: auto;
   pointer-events: none;
 }
@@ -65,10 +65,9 @@ body {
 /* La balle de jeu */
 #balle-game {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 180px;
+  height: 180px;
   pointer-events: none;
-  /* On utilise object-fit pour que l'image 2048×2048 rentre bien */
 }
 #balle-game img {
   width: 100%;
@@ -79,8 +78,8 @@ body {
 /* Plateformes */
 .platform {
   position: absolute;
-  width: 120px;
-  height: 120px;
+  width: 180px;
+  height: 180px;
   pointer-events: none;
 }
 .platform img {
@@ -105,22 +104,25 @@ body {
 /* ═══════════════════════════════════════════════════
    CONFIG
 ═══════════════════════════════════════════════════ */
-const BALL_SIZE       = 120;   // px (affiché)
-const PLAT_SIZE       = 120;   // px (affiché)
-const GRAVITY         = 0.55;  // px/frame²
-const JUMP_FORCE      = -14;   // px/frame  (négatif = vers le haut)
-const SCROLL_SPEED    = 3;     // px/frame  les plateformes avancent vers la gauche
-const PLAT_GAP_MIN    = 220;   // espace horizontal min entre plateformes
-const PLAT_GAP_MAX    = 340;   // espace horizontal max
-const PLAT_Y_RANGE    = 120;   // variation verticale max par rapport à la précédente
+const BALL_SIZE       = 180;   // px (affiché)
+const PLAT_SIZE       = 180;   // px (affiché)
+const GRAVITY         = 0.65;  // px/frame²
+const JUMP_FORCE      = -17;   // px/frame
+const SCROLL_SPEED    = 4;     // px/frame
+const PLAT_GAP_MIN    = 320;   // espace horizontal min
+const PLAT_GAP_MAX    = 480;   // espace horizontal max
+const PLAT_Y_RANGE    = 140;   // variation verticale max
+const JUMP_COOLDOWN   = 350;   // ms entre deux sauts (anti-spam)
 
 /* ═══════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════ */
-let vy = 0;           // vitesse verticale de la balle
-let ballY = 0;        // position top de la balle (px)
-const BALL_X = 200;   // position horizontale fixe de la balle
-let platforms = [];   // [{el, x, y}]
+let vy = 0;
+let ballY = 0;
+let onGround = false;         // vrai quand la balle est posée sur une plateforme
+let lastJumpTime = 0;         // timestamp du dernier saut
+const BALL_X = 220;
+let platforms = [];
 let rafId = null;
 let gameRunning = false;
 let screenH, screenW;
@@ -184,6 +186,8 @@ function startGame() {
   gameEl.appendChild(ballEl);
 
   platforms = [];
+  onGround = false;
+  lastJumpTime = 0;
 
   // Première plateforme : juste sous la balle (centre écran)
   const firstPlatY = screenH / 2 + BALL_SIZE * 0.55; // 5 % sous la balle = un peu plus que la moitié de la balle
@@ -218,7 +222,13 @@ function startGame() {
 function onTap(e) {
   e.preventDefault();
   if (!gameRunning) return;
-  vy = JUMP_FORCE;
+  const now = Date.now();
+  // Saut uniquement si posé sur une plateforme ET cooldown écoulé
+  if (onGround && now - lastJumpTime > JUMP_COOLDOWN) {
+    vy = JUMP_FORCE;
+    onGround = false;
+    lastJumpTime = now;
+  }
 }
 
 /* ═══════════════════════════════════════════════════
@@ -258,22 +268,23 @@ function loop() {
   }
 
   // Collision balle ↔ plateformes (atterrissage par le dessus)
-  const ballLeft  = BALL_X;
-  const ballRight = BALL_X + BALL_SIZE;
+  const ballLeft   = BALL_X;
+  const ballRight  = BALL_X + BALL_SIZE;
   const ballBottom = ballY + BALL_SIZE;
 
+  onGround = false;
   for (const p of platforms) {
     const platLeft  = p.x;
     const platRight = p.x + PLAT_SIZE;
     const platTop   = p.y;
 
-    // La balle est au-dessus de la plateforme et tombe dessus
-    const overlapX = ballRight > platLeft + 10 && ballLeft < platRight - 10;
-    const landingY = ballBottom >= platTop && ballBottom <= platTop + vy + GRAVITY + 12;
+    const overlapX = ballRight > platLeft + 15 && ballLeft < platRight - 15;
+    const landingY = ballBottom >= platTop && ballBottom <= platTop + Math.abs(vy) + GRAVITY + 14;
 
     if (overlapX && landingY && vy >= 0) {
-      ballY = platTop - BALL_SIZE;
-      vy = 0;
+      ballY    = platTop - BALL_SIZE;
+      vy       = 0;
+      onGround = true;
       break;
     }
   }
@@ -331,3 +342,4 @@ window.addEventListener('resize', () => {
 </script>
 </body>
 </html>
+
